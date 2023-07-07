@@ -1,5 +1,6 @@
 # Svelte Simple Forms
-This is a simple package for form validation on client side.Still under active development.
+This is a simple package for client side form validation for svelte and sveltekit without schemas.
+It has simple syntax for setting up validators for your fields 
 
 ## Usage
 
@@ -44,3 +45,5 @@ $:{
     {$form.passwordData.error}
 {/if}
 ```
+
+You can contribute and report issues at [Github](https://github.com/FarhanAliRaza/svelte-simple-forms).

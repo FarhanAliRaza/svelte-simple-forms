@@ -1,8 +1,17 @@
 {
 	"name": "svelte-simple-forms",
 	"version": "0.0.4",
-	"description": "Simple forms for SvelteKit",
-	"author": "Farhan Ali Raza",
+	"description": "Simple client side form validation without schemas for Svelte and SvelteKit",
+	"author": {
+		"name": "Farhan Ali Raza",
+		"email": "farhanalirazaazeemi@gmail.com"
+
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/FarhanAliRaza/svelte-simple-forms"
+	},
+
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run package",
