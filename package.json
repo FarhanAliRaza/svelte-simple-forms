@@ -1,6 +1,6 @@
 {
 	"name": "svelte-simple-forms",
-	"version": "0.0.4",
+	"version": "0.4.1",
 	"description": "Simple client side form validation without schemas for Svelte and SvelteKit",
 	"author": {
 		"name": "Farhan Ali Raza",

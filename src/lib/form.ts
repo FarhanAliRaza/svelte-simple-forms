@@ -4,7 +4,6 @@
 // Lisece: MIT
 
 import { writable } from 'svelte/store';
-import type { FormType, Field } from './types.js';
 
 const validValidators = [
 	'required',
@@ -14,122 +13,133 @@ const validValidators = [
 	'number',
 	'min',
 	'max',
-	'requiredWhen', // TODO: Implement this
-	'validValues', // TODO: Implement this
-	'equalTo'
+	'requiredWhen',
+	'validValues',
+	'equalTo',
+	'default'
 ];
 
 const defaultValidators = {
 	required: true,
 	email: false,
+	emailAllowedDomains: [], //TODO:
 	phone: false,
 	number: false,
 	min: 0,
 	max: 0,
-	requiredWhen: '',
-	validValues: [],
-	equalTo: ''
+	requiredWhen: '', //TODO:
+	validValues: [], //TODO:
+	equalTo: '',
+	default: null
 };
 
-export const form = createForm();
+function initForm(form) {
+	const keys = Object.keys(form);
+	let newForm = {
+		isValid: false
+	};
+	for (let index = 0; index < keys.length; index++) {
+		const key = keys[index];
+		const validators = form[key];
+
+		if (typeof validators === 'object') {
+			const validatorsKeys = Object.keys(validators);
+			if (keys.length === 0) {
+				throw new Error('No validators found for ' + key + ' *Form Validator* ');
+			}
+			for (let index = 0; index < validatorsKeys.length; index++) {
+				const validatorKey = validatorsKeys[index];
+				if (!validValidators.includes(validatorKey)) {
+					console.error(
+						'Invalid validator ' + validatorKey + ' found for ' + key + ' *Form Validator* '
+					);
+					throw new Error('Invalid validator ' + validatorKey + ' found for ' + key);
+				}
+			}
+		}
+		if (validators.default) {
+			newForm[key] = validators.default;
+		} else {
+			newForm[key] = '';
+		}
+		newForm[key + 'Data'] = {
+			validators: {
+				...defaultValidators,
+				...validators
+			},
+			error: '',
+			touched: false,
+			valid: false
+		};
+	}
+	return newForm;
+}
+
+
+function createDefaultErrors(formKeys){
+
+	const errors = {};
+	for (let index = 0; index < formKeys.length; index++) {
+		const key = formKeys[index];
+		errors[key] = [];
+	}
+	return errors;
+}
 
 
 
-function createForm() {
-	const { subscribe, set, update } = writable({});
+export function createForm(defaultForm = {}) {
+	const formKeys = Object.keys(defaultForm);
+	defaultForm = initForm(defaultForm);
 
 	return {
-		subscribe,
-		set,
-		validate: () =>
-			update((f) => {
-				// console.log('f', f);
-				const keys = Object.keys(f);
-
-				for (let index = 0; index < keys.length; index++) {
-					const key = keys[index];
-					if (key != 'isValid' && !key.includes('Data')) {
-						const field_value = f[key];
-						const keyy = key + 'Data';
-						const validators = f[keyy];
-
-						const new_validators = validate(f, field_value, validators);
-						f[keyy] = new_validators;
-						// console.log('new_validators', new_validators, key);
-					}
-				}
-				return f;
-			}),
-
-		reset: () => set({}),
-		init: (form) => {
-			const keys = Object.keys(form);
-			let newForm = {
-				isValid: false
-			};
+		...defaultForm,
+		formKeys,
+		errors: createDefaultErrors(formKeys),
+		validate: function () {
+			const keys = formKeys;
+			this['isValid'] = true;
 			for (let index = 0; index < keys.length; index++) {
 				const key = keys[index];
-				const validators = form[key];
-
-				if (typeof validators === 'object') {
-					const validatorsKeys = Object.keys(validators);
-					if (keys.length === 0) {
-						throw new Error('No validators found for ' + key + ' *Form Validator* ');
-					}
-					for (let index = 0; index < validatorsKeys.length; index++) {
-						const validatorKey = validatorsKeys[index];
-						if (!validValidators.includes(validatorKey)) {
-							console.error(
-								'Invalid validator ' + validatorKey + ' found for ' + key + ' *Form Validator* '
-							);
-							throw new Error('Invalid validator ' + validatorKey + ' found for ' + key);
-						}
-					}
+				const field_value = this[key];
+				const vkey = key + 'Data';
+				const validators = this[vkey];
+				const new_validators = validate(this, field_value, validators, key);
+				this[vkey] = new_validators;
+				if (new_validators['valid'] == false) {
+					this['isValid'] = false;
 				}
-
-				newForm[key] = '';
-				newForm[key + 'Data'] = {
-					validators: {
-						...defaultValidators,
-						...validators
-					},
-					error: '',
-					touched: false,
-					valid: false
-				};
+				console.log('new_validators', new_validators, key);
 			}
-			set(newForm);
+			return this;
 		}
 	};
 }
+
+
 
 function isTouched(value) {
 	return value !== '';
 }
 
-//TODO : Errors shoud be array
-
-function validate(f, value, validators) {
+function validate(f, value, validators, key) {
 	const validatorChecks = validators.validators;
 	if (validators['touched'] == false) {
-        console.log("value", value)
 		validators['touched'] = isTouched(value);
 	}
-    console.log("value", value)
-	
 	if (validators['touched'] == false) {
 		return validators;
 	}
-
 	validators['valid'] = true;
-	validators['error'] = '';
+	console.log('errors ********', f.errors[key]);
+	f.errors[key] = [];
 
 	if (validatorChecks['required'] == true) {
 		if (isEmpty(value)) {
 			if ('requiredMsg' in validators) {
-				validators['error'] = validators['requiredMsg'];
+				f.errors[key].push(validators['requiredMsg']);
 			} else {
-				validators['error'] = 'This field is required';
+				f.errors[key].push('This field is required');
 			}
 			validators['valid'] = false;
 		}
@@ -137,9 +147,9 @@ function validate(f, value, validators) {
 	if (validatorChecks['email'] == true) {
 		if (!emailValidator(value)) {
 			if ('emailMsg' in validators) {
-				validators['error'] = validators['emailMsg'];
+				f.errors[key].push(validators['emailMsg']);
 			} else {
-				validators['error'] = 'Invalid email address';
+				f.errors[key].push('Invalid email address');
 			}
 			validators['valid'] = false;
 		}
@@ -147,9 +157,9 @@ function validate(f, value, validators) {
 	if (validatorChecks['phone'] == true) {
 		if (!phoneValidator(value)) {
 			if ('phoneMsg' in validators) {
-				validators['error'] = validators['phoneMsg'];
+				f.errors[key].push(validators['phoneMsg']);
 			} else {
-				validators['error'] = 'Invalid phone number';
+				f.errors[key].push('Invalid phone number');
 			}
 			validators['valid'] = false;
 		}
@@ -157,9 +167,9 @@ function validate(f, value, validators) {
 	if (validatorChecks['number'] == true) {
 		if (!isNumber(value)) {
 			if ('numberMsg' in validators) {
-				validators['error'] = validators['numberMsg'];
+				f.errors[key].push(validators['numberMsg']);
 			} else {
-				validators['error'] = 'Only numbers are allowed';
+				f.errors[key].push('Only numbers are allowed');
 			}
 			validators['valid'] = false;
 		}
@@ -167,9 +177,9 @@ function validate(f, value, validators) {
 	if (validatorChecks['min'] > 0) {
 		if (!minCheck(validatorChecks['min'], value)) {
 			if ('minMsg' in validators) {
-				validators['error'] = validators['minMsg'];
+				f.errors[key].push(validators['minMsg']);
 			} else {
-				validators['error'] = 'Minimum length should be ' + validatorChecks['min'];
+				f.errors[key].push('Minimum length should be ' + validatorChecks['min']);
 			}
 			validators['valid'] = false;
 		}
@@ -177,26 +187,20 @@ function validate(f, value, validators) {
 	if (validatorChecks['max'] > 0) {
 		if (!maxCheck(validatorChecks['max'], value)) {
 			if ('maxMsg' in validators) {
-				validators['error'] = validators['maxMsg'];
+				f.errors[key].push(validators['maxMsg']);
 			} else {
-				validators['error'] = 'Maximum length should be ' + validatorChecks['max'];
+				f.errors[key].push('Maximum length should be ' + validatorChecks['max']);
 			}
 			validators['valid'] = false;
 		}
 	}
-	// if (validatorKey === 'requiredWhen') {
-	// 	if (!isNotEmpty(value)) {
-	// 		validators['error'] = 'This field is required';
-	// 		validators['valid'] = false;
-	// 		return validators;
-	// 	}
-	// }
+
 	if (validatorChecks['validValues'].length > 0) {
 		if (!validatorChecks['validValues'].includes(value)) {
 			if ('validMsg' in validators) {
-				validators['error'] = validators['validMsg'];
+				f.errors[key].push(validators['validMsg']);
 			} else {
-				validators['error'] = 'Invalid value';
+				f.errors[key].push('Invalid value');
 			}
 			validators['valid'] = false;
 		}
@@ -204,18 +208,16 @@ function validate(f, value, validators) {
 	if (validatorChecks['equalTo'] !== '') {
 		if (value !== f[validatorChecks['equalTo']]) {
 			if ('equalToMsg' in validators) {
-				validators['error'] = validators['equalToMsg'];
+				f.errors[key].push(validators['equalToMsg']);
 			} else {
-				validators['error'] = 'Value not matched';
+				f.errors[key].push('Value not matched');
 			}
 			validators['valid'] = false;
 		}
 	}
+	console.log('validatorKey at end', validators);
 	return validators;
-
 }
-
-
 
 const emailValidator = (email) => {
 	return String(email)
@@ -244,3 +246,37 @@ const minCheck = (min, value) => {
 const maxCheck = (max, value) => {
 	return value.length <= max;
 };
+export function createFormStore(defaultForm = {}) {
+	const formKeys = Object.keys(defaultForm);
+	defaultForm = initForm(defaultForm);
+	const { subscribe, set, update } = writable({
+		...defaultForm,
+		formKeys,
+		errors: createDefaultErrors(formKeys),
+	});
+
+	return {
+		subscribe,
+		set,
+		validate: () =>
+			update((f) => {
+				console.log('f', f);
+				const keys = f.formKeys;
+				f['isValid'] = true;
+				for (let index = 0; index < keys.length; index++) {
+					const key = keys[index];
+					const field_value = f[key];
+					const vkey = key + 'Data';
+					const validators = f[vkey];
+					const new_validators = validate(f, field_value, validators, key);
+					f[vkey] = new_validators;
+					if (new_validators['valid'] == false) {
+						f['isValid'] = false;
+					}
+
+					console.log('new_validators', new_validators, key);
+				}
+				return f;
+			})
+	};
+}
